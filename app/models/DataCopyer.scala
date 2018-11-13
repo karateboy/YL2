@@ -19,7 +19,7 @@ object CopyStep extends Enumeration {
 }
 object DataCopyer {
   case object StartCopy
-  case class CopyMonth(begin: DateTime)
+  case class CopyDay(begin: DateTime)
 
   var hourCopyer: ActorRef = _
 
@@ -123,14 +123,14 @@ object DataCopyer {
     }
   }
 
-  def copyDbMonth(begin: DateTime, step: CopyStep.Value) {
-    Logger.info(s"copy $step ${begin.toString("YY/MM/dd HH:mm")}")
+  def copyDbDay(begin: DateTime) {
+    Logger.info(s"copy day ${begin.toString("YY/MM/dd HH:mm")}")
 
     val result = DB readOnly {
       import java.util.Date
       implicit session =>
         val start = begin.toDate()
-        val end = (begin + 1.month).toDate()
+        val end = (begin + 1.day).toDate()
         sql"""
           Select [MStation], [MDate], [MItem], [MValue]
           From hour_data
@@ -138,7 +138,7 @@ object DataCopyer {
         """.map {
           rs =>
             val siteID = rs.int("MStation")
-            val date = rs.date("MDate")
+            val date = rs.timestamp("MDate")
             val item = rs.string("MItem").toInt
             val v = rs.doubleOpt("MValue")
             val mt = MonitorType.getMonitorTypeByItemID(item)
@@ -228,18 +228,18 @@ class DataCopyer(step: CopyStep.Value) extends Actor with ActorLogging {
       if (!copying) {
         for (start <- getCopyStart(step)) {
           if (start < DateTime.now()) {
-            self ! CopyMonth(start)
+            self ! CopyDay(start)
             context become handler(true)
           }
         }
       }
 
-    case CopyMonth(start) =>
-      copyDbMonth(start, step)
+    case CopyDay(start) =>
+      copyDbDay(start)
       val now = DateTime.now()
-      val nextStart = start + 1.month
+      val nextStart = start + 1.day
       if (nextStart < now) {
-        self ! CopyMonth(nextStart)
+        self ! CopyDay(nextStart)
       } else {
         context become handler(false)
       }

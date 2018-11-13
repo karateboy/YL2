@@ -12,9 +12,14 @@ object Global extends GlobalSettings {
     super.onStart(app)
     MongoDB.init()
 
-    CdxReceiver.startup
-    //CdxReceiver.getInboxFiles
-    CdxReceiver.parseXML
+    val cdxEnabled = Play.current.configuration.getBoolean("cdx.enable").getOrElse(false)
+    if (cdxEnabled) {
+      Logger.info(s"CDX $cdxEnabled")
+      CdxReceiver.startup
+      CdxReceiver.getInboxFiles
+      CdxReceiver.parseXML
+    }
+
     DataCopyer.startup()
     //OpenDataReceiver.startup()
   }
